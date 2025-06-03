@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etymology Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font - Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            color: #1e293b; /* Slate-800 */
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        .word-bubble {
+            background-color: #ffffff;
+            border: 2px solid #7c3aed; /* Purple-600 */
+            border-radius: 1rem; /* Rounded-2xl */
+            padding: 0.75rem 1rem; /* p-3 p-4 */
+            margin: 0.5rem;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out;
+            min-width: 150px;
+            max-width: 250px;
+        }
+        .word-bubble:hover {
+            transform: translateY(-2px);
+        }
+        .word-bubble .word-text {
+            font-weight: 600; /* Semibold */
+            color: #1d4ed8; /* Blue-700 */
+            font-size: 1.125rem; /* text-lg */
+        }
+        .word-bubble .word-origin {
+            font-size: 0.875rem; /* text-sm */
+            color: #475569; /* Slate-600 */
+            margin-top: 0.25rem;
+        }
+        .word-bubble .word-def {
+            font-size: 0.875rem; /* text-sm */
+            color: #334155; /* Slate-700 */
+            margin-top: 0.25rem;
+            font-style: italic;
+        }
+        .word-bubble .word-period {
+            font-size: 0.75rem; /* text-xs */
+            color: #64748b; /* Slate-500 */
+            margin-top: 0.25rem;
+        }
+
+        #etymologyVisualContainer {
+            position: relative;
+            width: 100%;
+            min-height: 300px;
+            overflow-x: auto; 
+            padding: 20px 0;
+            background-color: #e2e8f0; /* slate-200 */
+            border-radius: 0.5rem;
+        }
+
+        #etymologySvgCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; 
+        }
+
+        .bubble-wrapper { 
+            position: absolute;
+            z-index: 1; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .connector-symbol {
+            position: absolute;
+            font-size: 2.5rem; 
+            font-weight: bold;
+            color: #1d4ed8; 
+            z-index: 1; 
+            padding: 0; 
+            line-height: 1; 
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3; 
+            border-top: 5px solid #3b82f6; 
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .custom-btn {
+            background-color: #3b82f6; 
+            color: white;
+            font-weight: 500; 
+            padding: 0.625rem 1.25rem; 
+            border-radius: 0.5rem; 
+            transition: background-color 0.3s ease;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,.1), 0 1px 2px -1px rgba(0,0,0,.1);
+            display: inline-flex; 
+            align-items: center;
+            justify-content: center;
+        }
+        .custom-btn:hover {
+            background-color: #2563eb; 
+        }
+        .custom-btn:disabled {
+            background-color: #9ca3af; 
+            cursor: not-allowed;
+        }
+        .custom-input {
+            border: 1px solid #cbd5e1; 
+            padding: 0.5rem 0.75rem; 
+            border-radius: 0.375rem; 
+            width: 100%;
+        }
+        .custom-input:focus {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            border-color: #3b82f6; 
+            box-shadow: 0 0 0 2px #3b82f630;
+        }
+        .search-icon-btn { 
+            padding: 0.625rem; 
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <div class="w-full max-w-4xl bg-white shadow-xl rounded-lg p-6 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-blue-600">Etymology Explorer</h1>
+        </header>
+
+        <div id="controls" class="flex flex-col sm:flex-row gap-4 mb-8 items-center">
+            <input type="text" id="wordInput" class="custom-input flex-grow" placeholder="Enter a word (e.g., 'apple', 'serendipity')">
+            <div class="flex gap-2">
+                <button id="submitWord" class="custom-btn search-icon-btn w-auto" aria-label="Explore word">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </button>
+                <button id="randomWordBtn" class="custom-btn w-full sm:w-auto bg-slate-500 hover:bg-slate-600">Random Word</button>
+            </div>
+        </div>
+
+        <div id="loadingIndicator" class="text-center my-6" style="display:none;">
+            <div class="loader"></div>
+            <p class="text-slate-500 text-lg mt-2">Digging through the annals of language...</p>
+        </div>
+        
+        <div id="errorMessage" class="text-center my-6 p-4 bg-red-100 text-red-700 border border-red-300 rounded-md" style="display:none;"></div>
+
+        <div id="resultsArea" style="display:none;" class="space-y-6">
+            <div>
+                <h2 id="resultWord" class="text-4xl font-semibold text-blue-700 mb-2"></h2>
+                <p class="text-lg"><strong class="font-bold text-slate-800">Definition:</strong> <span id="definition" class="text-slate-600"></span></p>
+                <p class="text-lg"><strong class="font-bold text-slate-800">Example:</strong> <em id="exampleSentence" class="text-slate-600"></em></p>
+            </div>
+
+            <div>
+                <h3 class="text-3xl font-semibold text-blue-600 mb-2 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open-text mr-2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/><path d="M6 8h2"/><path d="M6 12h2"/><path d="M16 8h2"/><path d="M16 12h2"/></svg>
+                    Etymology Summary
+                </h3>
+                <p id="etymologySummary" class="text-slate-600 leading-relaxed bg-blue-50 p-4 rounded-md"></p>
+            </div>
+
+            <div>
+                <h3 class="text-3xl font-semibold text-blue-600 mb-3 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-git-fork mr-2"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9"/><path d="M12 12v3"/></svg>
+                    Etymological Path
+                </h3>
+                <div id="etymologyVisualContainer">
+                    <svg id="etymologySvgCanvas"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wordInput = document.getElementById('wordInput');
+        const submitWordBtn = document.getElementById('submitWord');
+        const randomWordBtn = document.getElementById('randomWordBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsArea = document.getElementById('resultsArea');
+
+        const resultWordDisplay = document.getElementById('resultWord');
+        const definitionDisplay = document.getElementById('definition');
+        const exampleSentenceDisplay = document.getElementById('exampleSentence');
+        const etymologySummaryDisplay = document.getElementById('etymologySummary');
+        const visualContainer = document.getElementById('etymologyVisualContainer');
+
+        const API_KEY = ""; 
+
+        submitWordBtn.addEventListener('click', () => {
+            const word = wordInput.value.trim();
+            if (word) {
+                fetchEtymology(word);
+            } else {
+                displayError("Please enter a word.");
+            }
+        });
+
+        wordInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                submitWordBtn.click();
+            }
+        });
+
+        randomWordBtn.addEventListener('click', async () => {
+            showLoading(true);
+            errorMessage.style.display = 'none';
+            resultsArea.style.display = 'none';
+            try {
+                const response = await fetch('https://random-word-api.vercel.app/api?words=1');
+                if (!response.ok) {
+                    throw new Error(`Random word API failed with status: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data && data[0]) {
+                    wordInput.value = data[0];
+                    fetchEtymology(data[0]);
+                } else {
+                    throw new Error('Could not fetch a random word.');
+                }
+            } catch (error) {
+                console.error("Error fetching random word:", error);
+                displayError(`Failed to fetch random word: ${error.message}`);
+                showLoading(false);
+            }
+        });
+
+        function showLoading(isLoading) {
+            loadingIndicator.style.display = isLoading ? 'block' : 'none';
+            submitWordBtn.disabled = isLoading;
+            randomWordBtn.disabled = isLoading;
+            if (isLoading) {
+              resultsArea.style.display = 'none';
+              errorMessage.style.display = 'none';
+            }
+        }
+
+        function displayError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            resultsArea.style.display = 'none';
+        }
+
+        async function fetchEtymology(word) {
+            showLoading(true);
+            word = word.toLowerCase(); 
+
+            const prompt = `For the word '${word}', provide its definition, an example sentence, and a detailed etymology.
+The etymology should include a narrative summary.
+Also, provide a structured lineage for a visual diagram. The lineage should be an array of objects, each representing a significant stage in the word's history from its earliest known roots to the modern form.
+Each stage must have:
+- 'id': A unique ID (e.g., 'apple_OldEnglish', '-ment_OldFrenchSuffix', 'scala_Latin').
+- 'word': The word form (e.g., "apple", "-ment", "scala"). 
+    - For suffixes, clearly denote them (e.g., "-suffix").
+    - CRITICAL: For the 'word' field, provide the most common or simplified spelling/representation. Avoid specialized phonetic or linguistic notations (like Proto-Indo-European laryngeals h₁, h₂, h₃, or asterisks for reconstructed forms unless the asterisk is standard like *bher-). Such details, if essential, should be in 'short_definition'.
+    - CRITICAL: Ensure the 'word' field contains only a SINGLE primary word form, not multiple forms separated by slashes or other delimiters (e.g., not 'form1/form2'). Choose the most representative form.
+- 'short_definition': A brief definition. For suffixes, explain their function (e.g., "suffix forming nouns of action").
+- 'language_origin': For language_origin, provide the specific language and its stage (e.g., 'Old English', 'Classical Latin', 'Ancient Greek').
+- 'approx_period': The approx_period should then be purely temporal (e.g., 'c. 1200', '8th century BCE', '4th-1st c. BCE') and should NOT repeat the language name if already specified in language_origin.
+- 'parent_ids': Array of parent 'id's. Empty for roots.
+- 'combination_type': One of 'EVOLUTION', 'COMBINATION_CONTEMPORARY', 'PHRASE_FORMATION'.
+
+CRITICAL FOR STAGED COMBINATIONS (e.g., base word evolution then affixation):
+If '${word}' (or an intermediate word) is formed by combining a base word with an affix (e.g., a suffix like "-ing" added to "scale", where "scale" itself evolved from "scala"), structure the lineage to reflect this timing precisely.
+Example for "scaling" from "scala" + "-ing":
+1. Include "scala" with its own history (e.g., as a root or evolving from earlier forms).
+2. Show "scala" evolving to "scale" (parent_id of "scale" would be the 'id' of "scala", combination_type 'EVOLUTION').
+3. Include the suffix "-ing" as a separate node in the lineage (e.g., id: "-ing_suffix", word: "-ing"). This "-ing" node should be structured so it appears in the visual path *at the historical stage and level where "scale" exists and is ready for combination*. If "-ing" has its own prior etymology, that can be shown, but its point of entry as a combinable element with "scale" is key. Ensure its 'level' in the visual hierarchy would align it correctly for combination with 'scale'.
+4. The word "scaling" (or an intermediate combined form like "scale-ing" if appropriate before the final modern word) must then list the 'id' of "scale" AND the 'id' of "-ing_suffix" in its 'parent_ids'. Its 'combination_type' must be 'COMBINATION_CONTEMPORARY'.
+The goal is to visually introduce an affix (like "-ing") into the etymological path only when it historically combines with the (potentially evolved) base word. The 'level' of the affix node and the evolved base node should allow them to be presented as contemporaries for the combination.
+
+Ensure the modern word ('${word}') is the final item.
+The lineage should include all key intermediate forms, sources, and significant affixes.
+If the word is an acronym or initialism, explain its components.
+Ensure all text provided (definitions, origins, periods) does not contain asterisks.
+Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the same historical level/period to be visually accurate.`;
+            
+            const payload = {
+              contents: [{ role: "user", parts: [{ text: prompt }] }],
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: "OBJECT",
+                  properties: {
+                    "word_queried": { "type": "STRING" },
+                    "definition": { "type": "STRING" },
+                    "example_sentence": { "type": "STRING" },
+                    "etymology_summary": { "type": "STRING" },
+                    "lineage": {
+                      "type": "ARRAY",
+                      "description": "Array of words/morphemes in the etymological lineage.",
+                      "items": {
+                        "type": "OBJECT",
+                        "properties": {
+                          "id": { "type": "STRING", "description": "A unique ID for this stage." },
+                          "word": { "type": "STRING", "description": "The word or morpheme form (e.g., 'apple', '-ment')." },
+                          "short_definition": { "type": "STRING", "description": "Brief definition or function." },
+                          "language_origin": { "type": "STRING", "description": "Language of origin." },
+                          "approx_period": { "type": "STRING", "description": "Approximate time period." },
+                          "parent_ids": {
+                            "type": "ARRAY",
+                            "description": "IDs of immediate parent(s). Empty for roots.",
+                            "items": { "type": "STRING" }
+                          },
+                          "combination_type": {
+                            "type": "STRING",
+                            "enum": ["EVOLUTION", "COMBINATION_CONTEMPORARY", "PHRASE_FORMATION"],
+                            "description": "How this form was derived."
+                          }
+                        },
+                        "required": ["id", "word", "short_definition", "language_origin", "approx_period", "parent_ids", "combination_type"]
+                      }
+                    }
+                  },
+                  "required": ["word_queried", "definition", "example_sentence", "etymology_summary", "lineage"]
+                }
+              }
+            };
+
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    const data = JSON.parse(text);
+                    
+                    displayResults(data);
+                } else {
+                    console.error("Unexpected API response structure:", result);
+                    throw new Error('Failed to parse etymology data from API response.');
+                }
+
+            } catch (error) {
+                console.error("Error fetching etymology:", error);
+                displayError(`Could not fetch etymology for "${word}". ${error.message}. Make sure your API key is configured if needed.`);
+            } finally {
+                showLoading(false); 
+            }
+        }
+
+        function displayResults(data) {
+            resultsArea.style.display = 'block';
+            errorMessage.style.display = 'none';
+
+            resultWordDisplay.textContent = (data.word_queried.charAt(0).toUpperCase() + data.word_queried.slice(1)).replace(/\*/g, '');
+            definitionDisplay.textContent = (data.definition || "").replace(/\*/g, '');
+            exampleSentenceDisplay.textContent = (data.example_sentence || "").replace(/\*/g, '');
+            etymologySummaryDisplay.innerHTML = (data.etymology_summary || "").replace(/\*/g, '').replace(/\n/g, '<br>');
+
+            renderEtymologyVisual(data.lineage, data.word_queried);
+        }
+        
+        function renderEtymologyVisual(lineage, targetWord) {
+            visualContainer.innerHTML = '<svg id="etymologySvgCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;"></svg>';
+            const newSvgCanvas = document.getElementById('etymologySvgCanvas');
+
+            if (!lineage || lineage.length === 0) {
+                visualContainer.innerHTML += '<p class="p-4 text-slate-500">No visual lineage data available.</p>';
+                return;
+            }
+
+            const nodes = {};
+            lineage.forEach(item => {
+                nodes[item.id] = { ...item, children: [], parentsData: [], element: null, plusSymbolElement: null, level: -1, x: 0, y: 0 };
+            });
+
+            lineage.forEach(item => {
+                if (item.parent_ids) {
+                    item.parent_ids.forEach(pid => {
+                        if (nodes[pid]) {
+                            nodes[pid].children.push(item.id);
+                            nodes[item.id].parentsData.push(nodes[pid]);
+                        } else {
+                            console.warn(`Parent ID ${pid} not found for child ${item.id}`);
+                        }
+                    });
+                }
+            });
+            
+            let maxLevel = 0;
+            function calculateLevels(nodeId, currentLevel) {
+                const node = nodes[nodeId];
+                if (!node) {
+                    // This can happen if a parent_id points to an ID not present in the lineage array.
+                    // This might occur if the API data is incomplete for a very complex case or an error.
+                    console.warn("Node not found in calculateLevels:", nodeId);
+                    return;
+                }
+                if (node.level < currentLevel) { 
+                    node.level = currentLevel;
+                    maxLevel = Math.max(maxLevel, currentLevel);
+                }
+                node.children.forEach(childId => calculateLevels(childId, currentLevel + 1));
+            }
+
+            lineage.filter(item => !item.parent_ids || item.parent_ids.length === 0)
+                   .forEach(rootNode => calculateLevels(rootNode.id, 0));
+            
+            // Second pass for nodes not reached (e.g. if a suffix is introduced mid-way without its own deep root in THIS specific query)
+            // Or if parents were not processed yet in the first pass.
+            let changedInPass;
+            let iterations = 0; // Safety break for complex/cyclic data
+            do {
+                changedInPass = false;
+                iterations++;
+                lineage.forEach(item => {
+                    const node = nodes[item.id];
+                    if (node.level === -1) { // Only consider nodes not yet leveled
+                        let maxParentLevel = -1;
+                        let allParentsLeveled = node.parentsData.length > 0; // Assume true if it has parents
+                        
+                        if (node.parentsData.length === 0) { // If it's a root node not caught in first pass
+                             node.level = 0;
+                             maxLevel = Math.max(maxLevel, node.level);
+                             changedInPass = true;
+                        } else {
+                            node.parentsData.forEach(p => {
+                                if (p.level === -1) {
+                                    allParentsLeveled = false; // At least one parent is not yet leveled
+                                }
+                                maxParentLevel = Math.max(maxParentLevel, p.level);
+                            });
+
+                            if (allParentsLeveled) { // All parents have a level, so this node can be leveled
+                                node.level = maxParentLevel + 1;
+                                maxLevel = Math.max(maxLevel, node.level);
+                                changedInPass = true;
+                            }
+                        }
+                    }
+                });
+            } while (changedInPass && iterations < lineage.length * 2); // Iteration limit
+
+
+            const levels = Array(maxLevel + 1).fill(null).map(() => []);
+            lineage.forEach(item => {
+                const node = nodes[item.id];
+                if (node.level !== -1 && node.level < levels.length) {
+                    levels[node.level].push(node);
+                } else if (node.level >= levels.length) { 
+                    while(levels.length <= node.level) levels.push([]);
+                    levels[node.level].push(node);
+                    maxLevel = Math.max(maxLevel, node.level); 
+                } else {
+                    console.warn("Node still un-leveled, placing at root:", node.id);
+                    levels[0].push(node); 
+                }
+            });
+            
+            const bubbleWidth = 200; 
+            const bubbleMinHeight = 120; 
+            const verticalSpacing = 120; 
+            const horizontalSpacing = 80; 
+            let diagramHeight = (maxLevel + 1) * (bubbleMinHeight + verticalSpacing);
+            let diagramWidth = 0;
+
+            levels.forEach((levelNodes, i) => {
+                const levelY = i * (bubbleMinHeight + verticalSpacing) + (bubbleMinHeight / 2) + 20; 
+                const currentLevelWidth = levelNodes.length * (bubbleWidth + horizontalSpacing);
+                diagramWidth = Math.max(diagramWidth, currentLevelWidth);
+
+                levelNodes.forEach((node, j) => {
+                    node.y = levelY;
+                    // Initial X positioning: Try to center under average parent X, or distribute
+                    if (node.parentsData.length > 0) {
+                        let avgParentX = 0;
+                        let count = 0;
+                        node.parentsData.forEach(p => {
+                            if (p.x !== undefined) { // Ensure parent has an x-coordinate
+                                avgParentX += p.x;
+                                count++;
+                            }
+                        });
+                        if (count > 0) node.x = avgParentX / count;
+                        else node.x = (diagramWidth / (levelNodes.length + 1)) * (j + 1) - diagramWidth / 2; // Fallback
+                    } else {
+                        node.x = (diagramWidth / (levelNodes.length + 1)) * (j + 1) - diagramWidth / 2;
+                    }
+                });
+            });
+            
+            // Collision avoidance and spreading pass (simple version)
+            for (let i = 0; i < levels.length; i++) {
+                const levelNodes = levels[i];
+                levelNodes.sort((a, b) => a.x - b.x); // Sort by current X
+                for (let j = 0; j < levelNodes.length - 1; j++) {
+                    const nodeA = levelNodes[j];
+                    const nodeB = levelNodes[j + 1];
+                    const minSeparation = bubbleWidth + horizontalSpacing * 0.75; // Desired gap
+                    if (nodeB.x < nodeA.x + minSeparation) {
+                        nodeB.x = nodeA.x + minSeparation;
+                    }
+                }
+                // Re-calculate effective width of this level after spreading
+                if (levelNodes.length > 0) {
+                     const levelActualWidth = (levelNodes[levelNodes.length -1].x - levelNodes[0].x) + bubbleWidth;
+                     diagramWidth = Math.max(diagramWidth, levelActualWidth);
+                }
+            }
+            
+            const containerClientWidth = visualContainer.clientWidth || 600; 
+            diagramWidth = Math.max(diagramWidth, containerClientWidth - 40); 
+            visualContainer.style.height = `${diagramHeight + 60}px`; 
+            const xOffsetGlobal = containerClientWidth > diagramWidth ? (containerClientWidth - diagramWidth) / 2 : 20;
+
+            Object.values(nodes).forEach(node => {
+                const bubbleWrapper = document.createElement('div');
+                bubbleWrapper.classList.add('bubble-wrapper');
+                
+                // Center the diagram content if diagramWidth is now larger due to spreading
+                const currentLevelNodes = levels[node.level] || [];
+                let levelStartX = 0;
+                if (currentLevelNodes.length > 0) {
+                    currentLevelNodes.sort((a,b)=>a.x-b.x);
+                    levelStartX = currentLevelNodes[0].x;
+                }
+                const finalX = node.x - levelStartX + ( (diagramWidth - ((currentLevelNodes[currentLevelNodes.length-1]?.x || node.x) - levelStartX + bubbleWidth) )/2 ) + xOffsetGlobal;
+                // const finalX = node.x + (diagramWidth / 2) + xOffsetGlobal; 
+
+
+                bubbleWrapper.style.left = `${finalX - bubbleWidth/2}px`; 
+                bubbleWrapper.style.top = `${node.y - bubbleMinHeight/2}px`; 
+                bubbleWrapper.style.width = `${bubbleWidth}px`;
+
+                const bubble = document.createElement('div');
+                bubble.classList.add('word-bubble');
+
+                let rawWord = (node.word || "").trim();
+                let cleanWord = rawWord;
+                if (cleanWord.includes('/')) { 
+                    cleanWord = cleanWord.split('/')[0].trim();
+                }
+                cleanWord = cleanWord.replace(/^(?:[hH]\d?[\-\*]?|\*)/, '').trim(); 
+                cleanWord = cleanWord.replace(/\*/g, ''); 
+
+                let cleanLanguageOrigin = (node.language_origin || "").replace(/\*/g, '').trim();
+                let cleanApproxPeriod = (node.approx_period || "").replace(/\*/g, '').trim();
+                let cleanShortDefinition = (node.short_definition || "").replace(/\*/g, '').trim();
+
+                if (cleanLanguageOrigin && cleanApproxPeriod && cleanApproxPeriod.toLowerCase() === cleanLanguageOrigin.toLowerCase()) {
+                    cleanApproxPeriod = ""; 
+                }
+                
+                bubble.innerHTML = `
+                    <div class="word-text">${cleanWord || rawWord}</div>
+                    <div class="word-origin">${cleanLanguageOrigin}</div>
+                    ${cleanApproxPeriod ? `<div class="word-period">${cleanApproxPeriod}</div>` : ''}
+                    <div class="word-def">${cleanShortDefinition}</div>
+                `;
+                bubbleWrapper.appendChild(bubble);
+                visualContainer.appendChild(bubbleWrapper);
+                node.element = bubbleWrapper; 
+            });
+            
+            requestAnimationFrame(() => {
+                newSvgCanvas.setAttribute('viewBox', `0 0 ${diagramWidth + xOffsetGlobal*2} ${diagramHeight + 60}`);
+                newSvgCanvas.style.width = `${diagramWidth + xOffsetGlobal*2}px`;
+                newSvgCanvas.style.height = `${diagramHeight + 60}px`;
+                const containerRect = visualContainer.getBoundingClientRect();
+
+                Object.values(nodes).forEach(node => {
+                    if (!node.element) return; 
+                    
+                    const childRect = node.element.getBoundingClientRect();
+                    const childCenterX = childRect.left - containerRect.left + childRect.width / 2 + visualContainer.scrollLeft;
+                    const childTopY = childRect.top - containerRect.top + visualContainer.scrollTop; 
+
+                    const validParents = node.parentsData.filter(p => p.element);
+
+                    if (node.combination_type === 'COMBINATION_CONTEMPORARY' && validParents.length > 1) {
+                        let commonParentY = 0; 
+                        let parentXCoords = [];
+                        
+                        validParents.forEach((p, index) => {
+                            const pRect = p.element.getBoundingClientRect();
+                            const pCenterX = pRect.left - containerRect.left + pRect.width / 2 + visualContainer.scrollLeft;
+                            const pCenterY = pRect.top - containerRect.top + pRect.height / 2 + visualContainer.scrollTop;
+                            if (index === 0) commonParentY = pCenterY; 
+                            parentXCoords.push(pCenterX);
+                        });
+                        
+                        parentXCoords.sort((a,b) => a - b); 
+                        const plusX = (parentXCoords[0] + parentXCoords[parentXCoords.length-1]) / 2; 
+                        const plusY = commonParentY; 
+
+                        if (!node.plusSymbolElement) {
+                            const plusSymbol = document.createElement('div');
+                            plusSymbol.classList.add('connector-symbol');
+                            plusSymbol.textContent = '+';
+                            
+                            visualContainer.appendChild(plusSymbol); 
+                            plusSymbol.style.left = `${plusX - plusSymbol.offsetWidth / 2}px`; 
+                            plusSymbol.style.top = `${plusY - plusSymbol.offsetHeight / 2}px`; 
+                            node.plusSymbolElement = plusSymbol;
+                        }
+                        
+                        const plusSymbolRect = node.plusSymbolElement.getBoundingClientRect();
+                        const plusSymbolCenterX = plusSymbolRect.left - containerRect.left + plusSymbolRect.width / 2 + visualContainer.scrollLeft;
+                        const plusSymbolCenterY = plusSymbolRect.top - containerRect.top + plusSymbolRect.height / 2 + visualContainer.scrollTop;
+                        const plusSymbolBottomY = plusSymbolRect.bottom - containerRect.top + visualContainer.scrollTop;
+
+                        validParents.forEach(p => {
+                            const pRect = p.element.getBoundingClientRect();
+                            const pCenterX = pRect.left - containerRect.left + pRect.width / 2 + visualContainer.scrollLeft;
+                            const pBottomY = pRect.bottom - containerRect.top + visualContainer.scrollTop;
+                            drawLine(newSvgCanvas, pCenterX, pBottomY, plusSymbolCenterX, plusSymbolCenterY, "line"); 
+                        });
+                        drawLine(newSvgCanvas, plusSymbolCenterX, plusSymbolBottomY, childCenterX, childTopY, "arrow"); 
+
+                    } else { 
+                        validParents.forEach(parent => {
+                            const pRect = parent.element.getBoundingClientRect();
+                            const pCenterX = pRect.left - containerRect.left + pRect.width / 2 + visualContainer.scrollLeft;
+                            const pBottomY = pRect.bottom - containerRect.top + visualContainer.scrollTop; 
+                            drawLine(newSvgCanvas, pCenterX, pBottomY, childCenterX, childTopY, "arrow"); 
+                        });
+                    }
+                });
+            });
+        }
+
+        function drawLine(svg, x1, y1, x2, y2, type = "arrow") {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            
+            let endX = x2;
+            let endY = y2;
+            const visualOffsetFromTargetTip = 3; 
+            const markerWidth = 8; 
+            const markerHeight = 6;
+
+            if (type === "arrow") { 
+                const lineShouldEndOffset = visualOffsetFromTargetTip + markerWidth;
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist > lineShouldEndOffset) {
+                    endX = x2 - (dx / dist) * lineShouldEndOffset;
+                    endY = y2 - (dy / dist) * lineShouldEndOffset;
+                } else if (dist > 0) { 
+                    endX = x1 + dx * 0.01; 
+                    endY = y1 + dy * 0.01;
+                } else { 
+                    return; 
+                }
+            } else if (type === "line") { 
+                const plusSymbolVisualRadius = 5; 
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > plusSymbolVisualRadius) {
+                    endX = x2 - (dx/dist) * plusSymbolVisualRadius;
+                    endY = y2 - (dy/dist) * plusSymbolVisualRadius;
+                } else if (dist > 0) {
+                    endX = x1 + dx * 0.1;
+                    endY = y1 + dy * 0.1;
+                } else {
+                    return;
+                }
+            }
+
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', endX);
+            line.setAttribute('y2', endY);
+            line.setAttribute('stroke', '#60a5fa'); 
+            line.setAttribute('stroke-width', '2.5'); 
+
+            if (type === "arrow") {
+                line.setAttribute('marker-end', 'url(#arrowhead)');
+            }
+            svg.appendChild(line);
+
+            if (!svg.querySelector('#arrowhead')) {
+                const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                marker.setAttribute('id', 'arrowhead');
+                marker.setAttribute('markerWidth', String(markerWidth)); 
+                marker.setAttribute('markerHeight', String(markerHeight));
+                marker.setAttribute('refX', '0'); 
+                marker.setAttribute('refY', String(markerHeight / 2)); 
+                marker.setAttribute('orient', 'auto'); 
+                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                polygon.setAttribute('points', `0 0, ${markerWidth} ${markerHeight/2}, 0 ${markerHeight}`); 
+                polygon.setAttribute('fill', '#60a5fa');
+                marker.appendChild(polygon);
+                defs.appendChild(marker);
+                svg.insertBefore(defs, svg.firstChild);
+            }
+        }
+    </script>
+</body>
+</html>
