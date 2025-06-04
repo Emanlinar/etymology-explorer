@@ -204,7 +204,7 @@
         const etymologySummaryDisplay = document.getElementById('etymologySummary');
         const visualContainer = document.getElementById('etymologyVisualContainer');
 
-        const API_KEY = ""; 
+        // API_KEY constant removed as it's handled by the serverless function
 
         submitWordBtn.addEventListener('click', () => {
             const word = wordInput.value.trim();
@@ -260,112 +260,38 @@
             resultsArea.style.display = 'none';
         }
 
+        // Updated fetchEtymology function to call the serverless function
         async function fetchEtymology(word) {
             showLoading(true);
             word = word.toLowerCase(); 
 
-            const prompt = `For the word '${word}', provide its definition, an example sentence, and a detailed etymology.
-The etymology should include a narrative summary.
-Also, provide a structured lineage for a visual diagram. The lineage should be an array of objects, each representing a significant stage in the word's history from its earliest known roots to the modern form.
-Each stage must have:
-- 'id': A unique ID (e.g., 'apple_OldEnglish', '-ment_OldFrenchSuffix', 'scala_Latin').
-- 'word': The word form (e.g., "apple", "-ment", "scala"). 
-    - For suffixes, clearly denote them (e.g., "-suffix").
-    - CRITICAL: For the 'word' field, provide the most common or simplified spelling/representation. Avoid specialized phonetic or linguistic notations (like Proto-Indo-European laryngeals h₁, h₂, h₃, or asterisks for reconstructed forms unless the asterisk is standard like *bher-). Such details, if essential, should be in 'short_definition'.
-    - CRITICAL: Ensure the 'word' field contains only a SINGLE primary word form, not multiple forms separated by slashes or other delimiters (e.g., not 'form1/form2'). Choose the most representative form.
-- 'short_definition': A brief definition. For suffixes, explain their function (e.g., "suffix forming nouns of action").
-- 'language_origin': For language_origin, provide the specific language and its stage (e.g., 'Old English', 'Classical Latin', 'Ancient Greek').
-- 'approx_period': The approx_period should then be purely temporal (e.g., 'c. 1200', '8th century BCE', '4th-1st c. BCE') and should NOT repeat the language name if already specified in language_origin.
-- 'parent_ids': Array of parent 'id's. Empty for roots.
-- 'combination_type': One of 'EVOLUTION', 'COMBINATION_CONTEMPORARY', 'PHRASE_FORMATION'.
-
-CRITICAL FOR STAGED COMBINATIONS (e.g., base word evolution then affixation):
-If '${word}' (or an intermediate word) is formed by combining a base word with an affix (e.g., a suffix like "-ing" added to "scale", where "scale" itself evolved from "scala"), structure the lineage to reflect this timing precisely.
-Example for "scaling" from "scala" + "-ing":
-1. Include "scala" with its own history (e.g., as a root or evolving from earlier forms).
-2. Show "scala" evolving to "scale" (parent_id of "scale" would be the 'id' of "scala", combination_type 'EVOLUTION').
-3. Include the suffix "-ing" as a separate node in the lineage (e.g., id: "-ing_suffix", word: "-ing"). This "-ing" node should be structured so it appears in the visual path *at the historical stage and level where "scale" exists and is ready for combination*. If "-ing" has its own prior etymology, that can be shown, but its point of entry as a combinable element with "scale" is key. Ensure its 'level' in the visual hierarchy would align it correctly for combination with 'scale'.
-4. The word "scaling" (or an intermediate combined form like "scale-ing" if appropriate before the final modern word) must then list the 'id' of "scale" AND the 'id' of "-ing_suffix" in its 'parent_ids'. Its 'combination_type' must be 'COMBINATION_CONTEMPORARY'.
-The goal is to visually introduce an affix (like "-ing") into the etymological path only when it historically combines with the (potentially evolved) base word. The 'level' of the affix node and the evolved base node should allow them to be presented as contemporaries for the combination.
-
-Ensure the modern word ('${word}') is the final item.
-The lineage should include all key intermediate forms, sources, and significant affixes.
-If the word is an acronym or initialism, explain its components.
-Ensure all text provided (definitions, origins, periods) does not contain asterisks.
-Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the same historical level/period to be visually accurate.`;
-            
-            const payload = {
-              contents: [{ role: "user", parts: [{ text: prompt }] }],
-              generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: "OBJECT",
-                  properties: {
-                    "word_queried": { "type": "STRING" },
-                    "definition": { "type": "STRING" },
-                    "example_sentence": { "type": "STRING" },
-                    "etymology_summary": { "type": "STRING" },
-                    "lineage": {
-                      "type": "ARRAY",
-                      "description": "Array of words/morphemes in the etymological lineage.",
-                      "items": {
-                        "type": "OBJECT",
-                        "properties": {
-                          "id": { "type": "STRING", "description": "A unique ID for this stage." },
-                          "word": { "type": "STRING", "description": "The word or morpheme form (e.g., 'apple', '-ment')." },
-                          "short_definition": { "type": "STRING", "description": "Brief definition or function." },
-                          "language_origin": { "type": "STRING", "description": "Language of origin." },
-                          "approx_period": { "type": "STRING", "description": "Approximate time period." },
-                          "parent_ids": {
-                            "type": "ARRAY",
-                            "description": "IDs of immediate parent(s). Empty for roots.",
-                            "items": { "type": "STRING" }
-                          },
-                          "combination_type": {
-                            "type": "STRING",
-                            "enum": ["EVOLUTION", "COMBINATION_CONTEMPORARY", "PHRASE_FORMATION"],
-                            "description": "How this form was derived."
-                          }
-                        },
-                        "required": ["id", "word", "short_definition", "language_origin", "approx_period", "parent_ids", "combination_type"]
-                      }
-                    }
-                  },
-                  "required": ["word_queried", "definition", "example_sentence", "etymology_summary", "lineage"]
-                }
-              }
-            };
+            // This is the path to your serverless function on Vercel.
+            // It's relative to your site's domain.
+            const serverlessFunctionUrl = `/api/getEtymology?word=${encodeURIComponent(word)}`;
 
             try {
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                const response = await fetch(serverlessFunctionUrl); 
 
                 if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
+                    let errorData = { error: `Serverless function request failed with status ${response.status}`};
+                    try {
+                        errorData = await response.json(); // Try to parse JSON error from our function
+                    } catch (e) {
+                        // If not JSON, use the status text or a generic message
+                        errorData.error = response.statusText || errorData.error;
+                    }
+                    throw new Error(errorData.error);
                 }
 
-                const result = await response.json();
+                const data = await response.json(); // Data is already parsed JSON from your serverless function
                 
-                if (result.candidates && result.candidates.length > 0 &&
-                    result.candidates[0].content && result.candidates[0].content.parts &&
-                    result.candidates[0].content.parts.length > 0) {
-                    const text = result.candidates[0].content.parts[0].text;
-                    const data = JSON.parse(text);
-                    
-                    displayResults(data);
-                } else {
-                    console.error("Unexpected API response structure:", result);
-                    throw new Error('Failed to parse etymology data from API response.');
-                }
+                // No need to check result.candidates here, as the serverless function handles it
+                displayResults(data);
 
             } catch (error) {
-                console.error("Error fetching etymology:", error);
-                displayError(`Could not fetch etymology for "${word}". ${error.message}. Make sure your API key is configured if needed.`);
+                console.error("Error fetching etymology via serverless function:", error);
+                // Display a user-friendly message, not the raw error for security.
+                displayError(`Could not fetch etymology for "${word}". Please try again later.`);
             } finally {
                 showLoading(false); 
             }
@@ -414,8 +340,6 @@ Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the s
             function calculateLevels(nodeId, currentLevel) {
                 const node = nodes[nodeId];
                 if (!node) {
-                    // This can happen if a parent_id points to an ID not present in the lineage array.
-                    // This might occur if the API data is incomplete for a very complex case or an error.
                     console.warn("Node not found in calculateLevels:", nodeId);
                     return;
                 }
@@ -429,32 +353,30 @@ Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the s
             lineage.filter(item => !item.parent_ids || item.parent_ids.length === 0)
                    .forEach(rootNode => calculateLevels(rootNode.id, 0));
             
-            // Second pass for nodes not reached (e.g. if a suffix is introduced mid-way without its own deep root in THIS specific query)
-            // Or if parents were not processed yet in the first pass.
             let changedInPass;
-            let iterations = 0; // Safety break for complex/cyclic data
+            let iterations = 0; 
             do {
                 changedInPass = false;
                 iterations++;
                 lineage.forEach(item => {
                     const node = nodes[item.id];
-                    if (node.level === -1) { // Only consider nodes not yet leveled
+                    if (node.level === -1) { 
                         let maxParentLevel = -1;
-                        let allParentsLeveled = node.parentsData.length > 0; // Assume true if it has parents
+                        let allParentsLeveled = node.parentsData.length > 0; 
                         
-                        if (node.parentsData.length === 0) { // If it's a root node not caught in first pass
+                        if (node.parentsData.length === 0) { 
                              node.level = 0;
                              maxLevel = Math.max(maxLevel, node.level);
                              changedInPass = true;
                         } else {
                             node.parentsData.forEach(p => {
                                 if (p.level === -1) {
-                                    allParentsLeveled = false; // At least one parent is not yet leveled
+                                    allParentsLeveled = false; 
                                 }
                                 maxParentLevel = Math.max(maxParentLevel, p.level);
                             });
 
-                            if (allParentsLeveled) { // All parents have a level, so this node can be leveled
+                            if (allParentsLeveled) { 
                                 node.level = maxParentLevel + 1;
                                 maxLevel = Math.max(maxLevel, node.level);
                                 changedInPass = true;
@@ -462,7 +384,7 @@ Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the s
                         }
                     }
                 });
-            } while (changedInPass && iterations < lineage.length * 2); // Iteration limit
+            } while (changedInPass && iterations < lineage.length * 2); 
 
 
             const levels = Array(maxLevel + 1).fill(null).map(() => []);
@@ -494,37 +416,34 @@ Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the s
 
                 levelNodes.forEach((node, j) => {
                     node.y = levelY;
-                    // Initial X positioning: Try to center under average parent X, or distribute
                     if (node.parentsData.length > 0) {
                         let avgParentX = 0;
                         let count = 0;
                         node.parentsData.forEach(p => {
-                            if (p.x !== undefined) { // Ensure parent has an x-coordinate
+                            if (p.x !== undefined) { 
                                 avgParentX += p.x;
                                 count++;
                             }
                         });
                         if (count > 0) node.x = avgParentX / count;
-                        else node.x = (diagramWidth / (levelNodes.length + 1)) * (j + 1) - diagramWidth / 2; // Fallback
+                        else node.x = (diagramWidth / (levelNodes.length + 1)) * (j + 1) - diagramWidth / 2; 
                     } else {
                         node.x = (diagramWidth / (levelNodes.length + 1)) * (j + 1) - diagramWidth / 2;
                     }
                 });
             });
             
-            // Collision avoidance and spreading pass (simple version)
             for (let i = 0; i < levels.length; i++) {
                 const levelNodes = levels[i];
-                levelNodes.sort((a, b) => a.x - b.x); // Sort by current X
+                levelNodes.sort((a, b) => a.x - b.x); 
                 for (let j = 0; j < levelNodes.length - 1; j++) {
                     const nodeA = levelNodes[j];
                     const nodeB = levelNodes[j + 1];
-                    const minSeparation = bubbleWidth + horizontalSpacing * 0.75; // Desired gap
+                    const minSeparation = bubbleWidth + horizontalSpacing * 0.75; 
                     if (nodeB.x < nodeA.x + minSeparation) {
                         nodeB.x = nodeA.x + minSeparation;
                     }
                 }
-                // Re-calculate effective width of this level after spreading
                 if (levelNodes.length > 0) {
                      const levelActualWidth = (levelNodes[levelNodes.length -1].x - levelNodes[0].x) + bubbleWidth;
                      diagramWidth = Math.max(diagramWidth, levelActualWidth);
@@ -540,16 +459,18 @@ Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the s
                 const bubbleWrapper = document.createElement('div');
                 bubbleWrapper.classList.add('bubble-wrapper');
                 
-                // Center the diagram content if diagramWidth is now larger due to spreading
                 const currentLevelNodes = levels[node.level] || [];
                 let levelStartX = 0;
-                if (currentLevelNodes.length > 0) {
-                    currentLevelNodes.sort((a,b)=>a.x-b.x);
-                    levelStartX = currentLevelNodes[0].x;
-                }
-                const finalX = node.x - levelStartX + ( (diagramWidth - ((currentLevelNodes[currentLevelNodes.length-1]?.x || node.x) - levelStartX + bubbleWidth) )/2 ) + xOffsetGlobal;
-                // const finalX = node.x + (diagramWidth / 2) + xOffsetGlobal; 
+                let levelEffectiveWidth = diagramWidth; 
 
+                if (currentLevelNodes.length > 0) {
+                    const sortedLevelNodes = [...currentLevelNodes].sort((a,b)=>a.x-b.x);
+                    levelStartX = sortedLevelNodes[0].x;
+                    levelEffectiveWidth = (sortedLevelNodes[sortedLevelNodes.length-1].x - levelStartX) + bubbleWidth;
+                }
+                
+                const levelCenteringOffset = (diagramWidth - levelEffectiveWidth) / 2;
+                const finalX = (node.x - levelStartX) + levelCenteringOffset + xOffsetGlobal;
 
                 bubbleWrapper.style.left = `${finalX - bubbleWidth/2}px`; 
                 bubbleWrapper.style.top = `${node.y - bubbleMinHeight/2}px`; 
@@ -723,4 +644,4 @@ Parents in 'parent_ids' for a 'COMBINATION_CONTEMPORARY' node must be from the s
         }
     </script>
 </body>
-</html>
+</ht
